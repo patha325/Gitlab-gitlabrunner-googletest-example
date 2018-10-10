@@ -1,0 +1,79 @@
+image: patha325/ubuntutestdocker
+
+variables:
+  GIT_STRATEGY: clone
+  GIT_SUBMODULE_STRATEGY: recursive
+
+stages:
+  - build
+  - test
+  - deploy
+
+build1:
+  stage: build
+  script:
+    - GTEST_DIR=$PWD/googletest/googletest
+    - cd googletest/googletest/
+    - g++ -isystem ${GTEST_DIR}/include -I${GTEST_DIR} -pthread -c ${GTEST_DIR}/src/gtest-all.cc 
+    - ar -rv libgtest.a gtest-all.o
+    - cd ../../
+    - g++ -std=c++11 -isystem ${GTEST_DIR}/include/ -pthread ./tests/test_main.cpp code/timesFive.cpp ./tests/test1.cpp  ${GTEST_DIR}/libgtest.a -o testExec1 --coverage
+  artifacts:
+    paths:
+    - testExec1
+    - "*.gcda"
+    - "*.gcno"
+
+build2:
+  stage: build
+  script:
+    - GTEST_DIR=$PWD/googletest/googletest
+    - cd googletest/googletest/
+    - g++ -isystem ${GTEST_DIR}/include -I${GTEST_DIR} -pthread -c ${GTEST_DIR}/src/gtest-all.cc 
+    - ar -rv libgtest.a gtest-all.o
+    - cd ../../
+    - g++ -std=c++11 -isystem ${GTEST_DIR}/include/ -pthread ./tests/test_main.cpp code/timesFive.cpp ./tests/test2.cpp  ${GTEST_DIR}/libgtest.a -o testExec2 --coverage
+  artifacts:
+    expire_in: 10 min
+    paths:
+    - testExec2
+    - "*.gcda"
+    - "*.gcno"
+
+test1:
+  stage: test
+  script:
+    - ./testExec1
+  dependencies:
+    - build1
+  artifacts:
+    expire_in: 10 min
+    paths:
+    - "*.gcda"
+    - "*.gcno"
+
+test2:
+  stage: test
+  script:
+    - ./testExec2
+  dependencies:
+    - build2
+  artifacts:
+    expire_in: 10 min
+    paths:
+    - "*.gcda"
+    - "*.gcno"
+
+coverageRap:
+  stage: deploy
+  script:
+    - apt install -y gcovr
+    - gcovr -e googletest/ --html --html-details -o coverage.html -s
+  dependencies:
+    - test1
+    - test2
+  coverage: '/lines:\s(\d{1,}\.\d{1}\%)/'
+  artifacts:
+    expire_in: 10 min
+    paths:
+      - "coverage*.html"
